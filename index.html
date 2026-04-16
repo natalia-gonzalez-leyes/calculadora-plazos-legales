@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Calculadora de Plazos Legales</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f4f6f8;
+        display: flex;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .container {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        width: 420px;
+    }
+
+    h2 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    label {
+        display: block;
+        margin-top: 10px;
+        font-weight: bold;
+    }
+
+    input, select, button {
+        width: 100%;
+        padding: 8px;
+        margin-top: 5px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+    }
+
+    button {
+        margin-top: 15px;
+        background: #007BFF;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    button:hover {
+        background: #0056b3;
+    }
+
+    .resultado {
+        margin-top: 15px;
+        padding: 10px;
+        background: #e9f5ff;
+        border-radius: 6px;
+    }
+
+    .calendario {
+        margin-top: 15px;
+        max-height: 250px;
+        overflow-y: auto;
+        border-top: 1px solid #ddd;
+        padding-top: 10px;
+    }
+
+    .dia {
+        padding: 6px;
+        margin-bottom: 4px;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .contado { background: #d4edda; }
+    .finsemana { background: #f8d7da; }
+    .festivo { background: #ffe5b4; }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h2>Plazos Legales</h2>
+
+    <label>Fecha inicial</label>
+    <input type="date" id="fecha">
+
+    <label>Número de días</label>
+    <input type="number" id="dias" min="1">
+
+    <label>Tipo de cómputo</label>
+    <select id="tipo">
+        <option value="naturales">Naturales</option>
+        <option value="habiles">Hábiles</option>
+    </select>
+
+    <label>Comunidad Autónoma</label>
+    <select id="ccaa">
+        <option value="nacional">Nacional</option>
+        <option value="andalucia">Andalucía</option>
+        <option value="madrid">Madrid</option>
+        <option value="cataluna">Cataluña</option>
+    </select>
+
+    <button onclick="calcular()">Calcular plazo</button>
+
+    <div class="resultado" id="resultado"></div>
+    <div class="calendario" id="calendario"></div>
+</div>
+
+<script>
+
+/* =========================
+   FESTIVOS POR TERRITORIO
+========================= */
+const festivosCA = {
+    nacional: [
+        "2026-01-01",
+        "2026-01-06",
+        "2026-05-01",
+        "2026-10-12",
+        "2026-12-06",
+        "2026-12-08",
+        "2026-12-25"
+    ],
+    andalucia: [
+        "2026-02-28",
+        "2026-08-15",
+        "2026-11-01"
+    ],
+    madrid: [
+        "2026-05-02",
+        "2026-07-25",
+        "2026-11-09"
+    ],
+    cataluna: [
+        "2026-09-11",
+        "2026-06-24",
+        "2026-04-01"
+    ]
+};
+
+/* =========================
+   FESTIVOS COMBINADOS
+========================= */
+function obtenerFestivos(year, ccaa) {
+    const nacionales = festivosCA.nacional;
+    const autonómicos = festivosCA[ccaa] || [];
+
+    return [...nacionales, ...autonómicos];
+}
+
+/* =========================
+   IDENTIFICAR FESTIVO
+========================= */
+function esFestivo(fecha, ccaa) {
+    const festivos = obtenerFestivos(fecha.getFullYear(), ccaa);
+    const fechaStr = fecha.toLocaleDateString("sv-SE");
+    return festivos.includes(fechaStr);
+}
+
+/* =========================
+   DÍA HÁBIL
+========================= */
+function esHabil(fecha, ccaa) {
+    const diaSemana = fecha.getDay();
+    return diaSemana !== 0 && diaSemana !== 6 && !esFestivo(fecha, ccaa);
+}
+
+/* =========================
+   CÁLCULO PRINCIPAL
+========================= */
+function calcular() {
+
+    const fechaInput = document.getElementById("fecha").value;
+    const dias = parseInt(document.getElementById("dias").value);
+    const tipo = document.getElementById("tipo").value;
+    const ccaa = document.getElementById("ccaa").value;
+
+    const resultado = document.getElementById("resultado");
+    const calendario = document.getElementById("calendario");
+
+    calendario.innerHTML = "";
+
+    if (!fechaInput || !dias) {
+        resultado.innerHTML = "Introduce todos los datos";
+        return;
+    }
+
+    let fecha = new Date(fechaInput);
+
+    // =========================
+    // DIES A QUO (NO COMPUTA)
+    // =========================
+    let actual = new Date(fecha);
+    let contador = 0;
+
+    while (contador < dias) {
+
+        actual.setDate(actual.getDate() + 1);
+
+        let diaSemana = actual.getDay();
+        let festivo = esFestivo(actual, ccaa);
+
+        let clase = "";
+        let texto = actual.toLocaleDateString("es-ES");
+
+        if (tipo === "habiles") {
+
+            if (diaSemana === 0 || diaSemana === 6) {
+                clase = "finsemana";
+                texto += " → Fin de semana (no computa)";
+            }
+            else if (festivo) {
+                clase = "festivo";
+                texto += " → Festivo (no computa)";
+            }
+            else {
+                clase = "contado";
+                texto += " → Día hábil (computa)";
+                contador++;
+            }
+
+        } else {
+            clase = "contado";
+            texto += " → Día natural";
+            contador++;
+        }
+
+        const div = document.createElement("div");
+        div.className = "dia " + clase;
+        div.textContent = texto;
+
+        calendario.appendChild(div);
+    }
+
+    // =========================
+    // AJUSTE DE VENCIMIENTO
+    // =========================
+    while (!esHabil(actual, ccaa) && tipo === "habiles") {
+        actual.setDate(actual.getDate() + 1);
+    }
+
+    const fechaFinal = new Intl.DateTimeFormat("es-ES").format(actual);
+
+    resultado.innerHTML = `
+        📅 <strong>Fecha final del plazo:</strong> ${fechaFinal}<br>
+        📌 Dies a quo: excluido (inicio al día siguiente)<br>
+        ⚖️ Cómputo: días ${tipo}<br>
+        📍 CCAA: ${ccaa}
+    `;
+}
+
+</script>
+
+</body>
+</html>
